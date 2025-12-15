@@ -1,38 +1,24 @@
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 import os
-import google.generativeai as genai
+from groq import Groq
+from analyzer import build_description
 
-# -----------------------
 # Load environment variables
-# -----------------------
 load_dotenv()
 
-API_KEY = os.getenv("GEMINI_API_KEY")
-if not API_KEY:
-    raise RuntimeError("GEMINI_API_KEY not found in .env file")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise RuntimeError("GROQ_API_KEY not found in .env file")
 
-# -----------------------
-# Configure Gemini
-# -----------------------
-genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel("gemini-pro")
+client = Groq(api_key=GROQ_API_KEY)
 
-# -----------------------
-# Create Flask app
-# -----------------------
 app = Flask(__name__)
 
-# -----------------------
-# Home route
-# -----------------------
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# -----------------------
-# Generate article route
-# -----------------------
 @app.route("/generate", methods=["POST"])
 def generate_article():
     data = request.json or {}
@@ -42,77 +28,60 @@ def generate_article():
     date = data.get("date", "Unknown date")
 
     if not tweet:
-        return jsonify({"article": "Please enter a tweet to generate an article."})
+        return jsonify({"article": "Please enter a tweet."})
+
+    # 🔹 Your deterministic system
+    description = build_description(tweet, author, date)
 
     prompt = f"""
-Rewrite the following tweet into a neutral, factual news-style article.
+You are a professional journalist.
 
-Rules:
-- Do NOT verify or judge the claims
-- Do NOT add new facts
-- Use neutral journalistic language
-- Mention that claims are unverified
+Rewrite the following description into a neutral, well-written news article.
+Do NOT add new facts.
+Do NOT remove information.
+Improve clarity and flow only.
 
-Tweet Author: {author}
-Date: {date}
-Platform: Twitter (X)
+Description:
+\"\"\"{description}\"\"\"
 
-Tweet:
-\"\"\"{tweet}\"\"\"
-
-Output:
-- Headline
-- 2–3 paragraph article
-- Disclaimer
+Output format:
+Headline:
+Article:
+Disclaimer:
 """
 
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": 0.3,
-                "max_output_tokens": 400
-            }
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": "You rewrite text into neutral news articles."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=400
         )
 
-        # Safe extraction
-        article = response.text.strip()
-
-        if article:
-            return jsonify({"article": article})
-
-        raise Exception("Empty response from Gemini")
+        article = response.choices[0].message.content.strip()
+        return jsonify({"article": article})
 
     except Exception as e:
-        print("Gemini blocked or failed:", e)
+        print("GROQ ERROR:", e)
 
-        # ---- GUARANTEED FALLBACK (DEMO MODE) ----
-        fallback_article = f"""
+        fallback = f"""
 Headline:
 {author} Shares Statement on Social Media
 
 Article:
-On {date}, {author} posted a message on Twitter that drew public attention.
-
-The post reflects the views of the author as expressed on the platform. While the statement has been discussed due to the influence of public figures, the claims made in the post have not been independently verified.
-
-Such statements often generate conversation because of the speed and reach of social media.
+{description}
 
 Disclaimer:
-This article is an AI-generated, informational rewrite of a public tweet and does not verify or endorse the claims made.
+This article is an AI-assisted rewrite of a public tweet and does not verify or endorse the claims made.
 """
+        return jsonify({"article": fallback})
 
-        return jsonify({"article": fallback_article})
-
-# -----------------------
-# Test route (sanity check)
-# -----------------------
 @app.route("/test")
 def test():
-    return "Flask server is running successfully."
+    return jsonify({"status": "Flask + Groq + Analyzer system is running."})
 
-# -----------------------
-# Run the app (MUST be last)
-# -----------------------
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(debug=True)

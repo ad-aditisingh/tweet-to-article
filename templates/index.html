@@ -6,18 +6,26 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h1>Tweet → News Article Generator</h1>
 
-    <input type="text" id="author" placeholder="Author (e.g. Donald Trump)">
-    <input type="text" id="date" placeholder="Date (e.g. 12 March 2025)">
-    <textarea id="tweet" placeholder="Paste tweet here..."></textarea>
+    <h1>Tweet to News Article Generator</h1>
 
-    <button onclick="generateArticle()">Generate Article</button>
+    <div class="form">
+        <label>Author</label>
+        <input type="text" id="author" placeholder="e.g. Sundar Pichai">
 
-    <h2>Generated Article</h2>
-    <pre id="output"></pre>
+        <label>Date</label>
+        <input type="text" id="date" placeholder="e.g. 15 January 2025">
+
+        <label>Tweet</label>
+        <textarea id="tweet" placeholder="Paste tweet here..."></textarea>
+
+        <button onclick="generateArticle()">Generate Article</button>
+    </div>
+
+    <hr>
+
+    <div id="output"></div>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
-
