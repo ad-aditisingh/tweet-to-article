@@ -14,11 +14,7 @@ function generateArticle() {
     fetch("/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            tweet: tweet,
-            author: author,
-            date: date
-        })
+        body: JSON.stringify({ tweet, author, date })
     })
     .then(res => res.json())
     .then(data => {
@@ -27,35 +23,40 @@ function generateArticle() {
             return;
         }
 
-        const text = data.article;
+        let text = data.article;
 
-        // ----------------------------
-        // HEADLINE (with safe fallback)
-        // ----------------------------
-        const headlineMatch = text.match(/Headline:\s*([\s\S]*?)\n\n/i);
-        const headline = headlineMatch
-            ? headlineMatch[1].trim()
-            : `${author || "Public Figure"} Shares Views on Technology`;
+        // -------- HEADLINE --------
+        let headline = "";
 
-        // ----------------------------
-        // ARTICLE BODY (ROBUST)
-        // ----------------------------
-        const articleMatch = text.match(/Article:\s*([\s\S]*)/i);
-        let articleBody = articleMatch ? articleMatch[1] : text;
+        // Priority 1: Headline:
+        const h1 = text.match(/Headline:\s*([\s\S]*?)\n\n/i);
+        if (h1) {
+            headline = h1[1].trim();
+        } else {
+            // Priority 2: **Markdown headline**
+            const h2 = text.match(/\*\*(.+?)\*\*/);
+            if (h2) {
+                headline = h2[1].trim();
+            } else {
+                // Fallback
+                headline = `${author || "Public Figure"} Highlights Key Views`;
+            }
+        }
 
-        // Keep ONLY first paragraph, remove extra text safely
-        articleBody = articleBody
-            .replace(/Disclaimer:[\s\S]*/gi, "")
+        // -------- ARTICLE BODY --------
+        let body = text;
+
+        // Remove headline labels & markdown
+        body = body
+            .replace(/Headline:[\s\S]*?\n\n/i, "")
+            .replace(/\*\*/g, "")
+            .replace(/Disclaimer:[\s\S]*/i, "")
             .replace(/\n+/g, " ")
             .trim();
 
-
-        // ----------------------------
-        // RENDER OUTPUT (PLAIN STYLE)
-        // ----------------------------
         output.innerHTML = `
             <div class="headline">${headline}</div>
-            <div class="article">${articleBody}</div>
+            <div class="article">${body}</div>
             <div class="disclaimer">
                 The statement attributed to ${author || "the author"} has not been independently verified and is presented here for informational purposes only.
             </div>
